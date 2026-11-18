@@ -136,6 +136,13 @@ input:focus,select:focus{outline:none;border-color:var(--brand)}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;z-index:200;font-size:15px;max-width:90vw;box-shadow:0 8px 24px #0004}
 @media (max-width:640px){.item{grid-template-columns:1fr}.drop{aspect-ratio:16/10}}
 
+#saveBar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fffffff5;backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:12px 16px calc(env(safe-area-inset-bottom) + 12px)}
+#saveBar .sb-in{max-width:980px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+#saveBar .sb-status{flex:1;min-width:200px;font-size:14px;color:var(--muted)}
+#saveBar .sb-status.ok{color:#0a8a5f}#saveBar .sb-status.bad{color:var(--danger)}
+#saveBar .progress{flex-basis:100%;order:3;margin:0}
+#saveBar .sb-btns{display:flex;gap:8px}
+#saveBtn{font-size:18px;padding:12px 26px}
 /* ---------- พิมพ์บัตร ---------- */
 #printArea{display:none}
 @media print{
@@ -195,6 +202,11 @@ input:focus,select:focus{outline:none;border-color:var(--brand)}
     </div>
   </header>
 
+  <div class="panel apiOnly hidden" id="pinPanel">
+    <h2>🔑 รหัสครู</h2>
+    <input id="pinInput" type="password" placeholder="ใส่รหัสที่ตั้งไว้ใน Apps Script (ใส่ครั้งเดียว เครื่องจะจำไว้)">
+  </div>
+
   <div class="panel">
     <h2><span class="step">1</span>ชื่อชุด</h2>
     <input id="setTitle" placeholder="เช่น บัตรคำ ป.1 หน่วยที่ 1">
@@ -211,7 +223,7 @@ input:focus,select:focus{outline:none;border-color:var(--brand)}
     </div>
   </div>
 
-  <div class="panel">
+  <div class="panel fileOnly">
     <h2><span class="step">3</span>ประมวลผล และทดลองส่อง</h2>
     <button class="primary" id="compileBtn" style="width:100%;padding:16px;font-size:18px">⚙️ ประมวลผลภาพหลัก</button>
     <div class="progress hidden" id="progWrap"><div id="prog"></div></div>
@@ -222,7 +234,7 @@ input:focus,select:focus{outline:none;border-color:var(--brand)}
     </div>
   </div>
 
-  <div class="panel">
+  <div class="panel fileOnly">
     <h2><span class="step">4</span>เผยแพร่ให้นักเรียน และพิมพ์บัตร</h2>
     <div class="field">
       <label>ที่อยู่เว็บที่นักเรียนจะเปิด (ใช้สร้าง QR Code บนบัตร)</label>
@@ -242,6 +254,17 @@ input:focus,select:focus{outline:none;border-color:var(--brand)}
   </div>
 </section>
 
+<div id="saveBar" class="hidden">
+  <div class="sb-in">
+    <div class="sb-status" id="saveStatus">ใส่ภาพหลักและสิ่งที่จะลอยขึ้นมา แล้วกดบันทึก</div>
+    <div class="progress hidden" id="saveProgWrap"><div id="saveProg"></div></div>
+    <div class="sb-btns">
+      <button class="ghost" id="sbPreview" title="ลองส่องในเครื่องนี้">📱 ลองส่อง</button>
+      <button class="ghost" id="sbPrint" title="พิมพ์บัตรภาพหลัก">🖨️ พิมพ์</button>
+      <button class="primary" id="saveBtn">✅ บันทึก</button>
+    </div>
+  </div>
+</div>
 <div id="printArea"></div>
 <div id="toast" class="hidden"></div>
 
@@ -254,7 +277,18 @@ import { MindARThree } from 'mindar-image-three';
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);
 const IS_CREATE = params.has('create');
+// ===== ตั้งค่า: ใส่ลิงก์ Web App ของ Google Apps Script (ถ้าเว้นว่าง จะใช้ไฟล์ ar-data.json แทน) =====
+const API_URL = 'https://script.google.com/macros/s/AKfycbymeyE6NRSAUSTiVqhEwIUqmoBhgV6qX8qTpJhD_JeEcudS6VHdI8CNi4UVsnhMvv4O/exec';
+// =====================================================================================
+const SET = params.get('set') || 'main';
 const DATA_FILE = params.get('data') || 'ar-data.json';
+const PIN_KEY = 'ar-maker-pin';
+async function loadData() {
+  const url = API_URL ? `${API_URL}?set=${encodeURIComponent(SET)}&t=${Date.now()}` : DATA_FILE;
+  const r = await fetch(url, { cache: 'no-cache' });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
 const STORE_KEY = 'ar-maker-project-v1';
 
 /* ---------------- ทั่วไป ---------------- */
@@ -474,21 +508,19 @@ function openModal(item) {
 $('#modalClose').onclick = () => { $('#modal').classList.add('hidden'); $('#modalBody').innerHTML = ''; modalItem = null; };
 $('#modalOpen').onclick = () => { if (modalItem) { const c = resolveContent(modalItem); if (c.open) window.open(c.open, '_blank'); } };
 $('#fullBtn').onclick = () => { if (arState?.current) openModal(arState.current.item); };
-$('#closeAR').onclick = () => { stopAR(); if (IS_CREATE) $('#creator').classList.remove('hidden'); };
+$('#closeAR').onclick = () => { stopAR(); if (IS_CREATE) { $('#creator').classList.remove('hidden'); if (API_URL) $('#saveBar').classList.remove('hidden'); } };
 
 /* ---------------- หน้าแรกนักเรียน ---------------- */
 async function initViewer() {
   $('#home').classList.remove('hidden');
   let data = null;
   try {
-    const r = await fetch(DATA_FILE, { cache: 'no-cache' });
-    if (!r.ok) throw new Error(r.status);
-    data = await r.json();
+    data = await loadData();
     if (!data.mind || !Array.isArray(data.items) || !data.items.length) throw new Error('bad');
   } catch {
     $('#startBtn').classList.add('hidden');
     $('#homeMsg').classList.remove('hidden');
-    $('#homeMsg').innerHTML = `ยังไม่มีชุด AR ในเว็บนี้ (ไม่พบไฟล์ <b>${esc(DATA_FILE)}</b>)<br><br><a href="?create"><button class="primary">🪄 สร้างชุด AR</button></a>`;
+    $('#homeMsg').innerHTML = `ยังไม่มีชุด AR<br><br><a href="?create${SET !== 'main' ? '&set=' + encodeURIComponent(SET) : ''}"><button class="primary">🪄 สร้างชุด AR</button></a>`;
     return;
   }
   document.title = 'ส่อง';
@@ -615,7 +647,7 @@ function validate() {
 
 let CompilerCls = null;
 async function compile() {
-  const err = validate(); if (err) return toast('⚠️ ' + err);
+  const err = validate(); if (err) { toast('⚠️ ' + err); return false; }
   const btn = $('#compileBtn'); btn.disabled = true;
   $('#progWrap').classList.remove('hidden'); $('#prog').style.width = '0%';
   const st = $('#compileStatus'); st.className = 'status';
@@ -627,6 +659,8 @@ async function compile() {
     const t0 = performance.now();
     await compiler.compileImageTargets(imgs, p => {
       $('#prog').style.width = Math.min(100, p).toFixed(0) + '%';
+      $('#saveProg').style.width = Math.min(100, p).toFixed(0) + '%';
+      setSaveStatus(`กำลังเตรียมภาพหลัก ${Math.min(100, p).toFixed(0)}% …`);
       st.textContent = `กำลังประมวลผลภาพหลัก ${Math.min(100, p).toFixed(0)}% (มือถืออาจใช้เวลาภาพละ 10–30 วินาที)`;
     });
     const buf = compiler.exportData();
@@ -634,10 +668,12 @@ async function compile() {
     save();
     $('#prog').style.width = '100%';
     refreshCompileState();
-    toast(`✅ ประมวลผลเสร็จใน ${((performance.now() - t0) / 1000).toFixed(1)} วินาที`);
+    if (!API_URL) toast(`✅ ประมวลผลเสร็จใน ${((performance.now() - t0) / 1000).toFixed(1)} วินาที`);
+    return true;
   } catch (e) {
     console.error(e);
     st.textContent = '❌ ประมวลผลไม่สำเร็จ: ' + (e?.message || e);
+    return false;
   } finally { btn.disabled = false; setTimeout(() => $('#progWrap').classList.add('hidden'), 800); }
 }
 
@@ -655,19 +691,20 @@ function download() {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   toast(`💾 ดาวน์โหลดแล้ว (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
 }
-function importData(data, from) {
+function importData(data, from, quiet) {
   if (!data || !Array.isArray(data.items)) return toast('ไฟล์ไม่ถูกต้อง');
   project.title = data.title || '';
   project.items = data.items.map(x => ({ ...newItem(), ...x, _typeTouched: true }));
   compiled = data.mind ? { mindB64: data.mind, sig: sigOf() } : null;
   $('#setTitle').value = project.title;
   save(); renderItems(); refreshCompileState();
-  toast(`📂 เปิดชุด "${project.title || 'ไม่มีชื่อ'}" จาก${from}แล้ว (${project.items.length} ภาพ)`);
+  if (!quiet) toast(`📂 เปิดชุด "${project.title || 'ไม่มีชื่อ'}" จาก${from}แล้ว (${project.items.length} ภาพ)`);
 }
 
 function printCards() {
   const err = validate(); if (err) return toast('⚠️ ' + err);
-  const url = ($('#viewerUrl').value || '').trim();
+  let url = ($('#viewerUrl').value || '').trim();
+  if (API_URL && SET !== 'main' && url && !url.includes('set=')) url += (url.includes('?') ? '&' : '?') + 'set=' + encodeURIComponent(SET);
   let qrHtml = '';
   if (url && window.qrcode) { const q = qrcode(0, 'M'); q.addData(url); q.make(); qrHtml = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); }
   $('#printArea').innerHTML = project.items.map((it, i) => `
@@ -682,7 +719,39 @@ function printCards() {
   setTimeout(() => window.print(), 300);
 }
 
-function initCreator() {
+function setSaveStatus(t, cls = '') { const e = $('#saveStatus'); e.textContent = t; e.className = 'sb-status ' + cls; }
+const compiledOk = () => compiled && compiled.sig === sigOf() && project.items.length;
+
+async function saveAll() {
+  const err = validate(); if (err) { setSaveStatus('⚠️ ' + err, 'bad'); return toast('⚠️ ' + err); }
+  const pin = ($('#pinInput').value || '').trim();
+  if (!pin) { setSaveStatus('⚠️ กรุณาใส่รหัสครูด้านบนก่อน', 'bad'); $('#pinInput').focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const btn = $('#saveBtn'); btn.disabled = true;
+  try {
+    if (!compiledOk()) {
+      $('#saveProgWrap').classList.remove('hidden');
+      const ok = await compile();
+      $('#saveProgWrap').classList.add('hidden');
+      if (!ok) { setSaveStatus('❌ เตรียมภาพหลักไม่สำเร็จ ลองเปลี่ยนภาพแล้วบันทึกใหม่', 'bad'); return; }
+    }
+    setSaveStatus('กำลังบันทึกขึ้นระบบ…');
+    const r = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ pin, set: SET, data: exportData() }) });
+    const res = await r.json();
+    if (!res.ok) {
+      if (res.error === 'pin') { setSaveStatus('❌ รหัสครูไม่ถูกต้อง', 'bad'); toast('รหัสครูไม่ถูกต้อง'); }
+      else setSaveStatus('❌ บันทึกไม่สำเร็จ: ' + (res.error || ''), 'bad');
+      return;
+    }
+    try { localStorage.setItem(PIN_KEY, pin); } catch {}
+    setSaveStatus(`✅ บันทึกแล้ว ${project.items.length} ภาพ — นักเรียนกด "ส่อง" ได้เลย`, 'ok');
+    toast('✅ บันทึกแล้ว นักเรียนส่องได้เลย');
+  } catch (e) {
+    console.error(e);
+    setSaveStatus('❌ ติดต่อระบบไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองใหม่', 'bad');
+  } finally { btn.disabled = false; }
+}
+
+async function initCreator() {
   $('#creator').classList.remove('hidden');
   document.title = 'สร้างชุด AR';
   try {
@@ -708,6 +777,27 @@ function initCreator() {
       importData(d, 'เว็บ'); } catch { toast(`ไม่พบไฟล์ ${DATA_FILE} บนเว็บนี้`); }
   };
   renderItems(); refreshCompileState();
+
+  if (API_URL) {
+    document.querySelectorAll('.fileOnly').forEach(e => e.classList.add('hidden'));
+    $('#pinPanel').classList.remove('hidden');
+    $('#saveBar').classList.remove('hidden');
+    try { $('#pinInput').value = localStorage.getItem(PIN_KEY) || ''; } catch {}
+    if ($('#pinInput').value) $('#pinPanel').classList.add('hidden');
+    $('#saveBtn').onclick = saveAll;
+    $('#sbPrint').onclick = printCards;
+    $('#sbPreview').onclick = async () => {
+      if (!compiledOk()) { $('#saveProgWrap').classList.remove('hidden'); const ok = await compile(); $('#saveProgWrap').classList.add('hidden'); if (!ok) return; setSaveStatus('พร้อมลองส่อง (ยังไม่ได้บันทึก)'); }
+      $('#creator').classList.add('hidden'); $('#saveBar').classList.add('hidden'); startAR(exportData());
+    };
+    // ดึงชุดล่าสุดจากระบบมาแก้ต่อ
+    setSaveStatus('กำลังโหลดชุดล่าสุด…');
+    try {
+      const d = await loadData();
+      if (d && Array.isArray(d.items) && d.items.length) { importData(d, 'ระบบ', true); setSaveStatus(`ชุดนี้มี ${d.items.length} ภาพ แก้ไขแล้วกดบันทึก`); }
+      else setSaveStatus('ใส่ภาพหลักและสิ่งที่จะลอยขึ้นมา แล้วกดบันทึก');
+    } catch { setSaveStatus('ใส่ภาพหลักและสิ่งที่จะลอยขึ้นมา แล้วกดบันทึก'); }
+  }
 }
 
 if (IS_CREATE) initCreator(); else initViewer();
