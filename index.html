@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ส่อง AR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js",
+    "mindar-image": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"
+  }
+}
+</script>
+<style>
+:root{
+  --ink:#1f2340; --muted:#6b6f8c; --line:#e3e5f0; --bg:#f5f6fb; --card:#fff;
+  --brand:#5b4bff; --brand2:#00b8a9; --warn:#ff8a3d; --danger:#e5484d;
+  --radius:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:'Sarabun',system-ui,sans-serif;color:var(--ink);background:var(--bg);-webkit-tap-highlight-color:transparent}
+h1,h2,h3,button,.mitr{font-family:'Mitr','Sarabun',sans-serif;font-weight:500}
+button{cursor:pointer;border:0;border-radius:12px;font-size:16px;padding:10px 16px;background:var(--line);color:var(--ink)}
+button.primary{background:var(--brand);color:#fff}
+button.teal{background:var(--brand2);color:#fff}
+button.ghost{background:transparent;border:1.5px solid var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+input,select{font:inherit;font-size:16px;padding:9px 11px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%}
+input:focus,select:focus{outline:none;border-color:var(--brand)}
+.hidden{display:none!important}
+
+/* ---------- หน้าแรกนักเรียน ---------- */
+#home{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:28px 18px 40px;
+  background:radial-gradient(circle at 20% 0%,#e9e6ff 0,transparent 55%),radial-gradient(circle at 100% 30%,#d9f7f3 0,transparent 50%),var(--bg)}
+#home .logo{width:86px;height:86px;border-radius:26px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;font-size:44px;box-shadow:0 12px 30px #5b4bff44;margin-top:10px}
+#home h1{font-size:28px;margin:18px 0 4px;text-align:center}
+#home p.sub{color:var(--muted);margin:0 0 22px;text-align:center}
+#startBtn{font-size:22px;padding:18px 36px;border-radius:20px;box-shadow:0 10px 24px #5b4bff55}
+#home .targets{margin-top:30px;width:100%;max-width:560px}
+#home .targets h3{font-size:16px;color:var(--muted);margin:0 0 10px}
+.thumbGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.thumbGrid figure{margin:0;background:#fff;border-radius:12px;padding:6px;box-shadow:0 2px 8px #0000000d}
+.thumbGrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block}
+.thumbGrid figcaption{font-size:13px;text-align:center;padding:5px 2px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#home .teacher{margin-top:auto;padding-top:30px;font-size:14px;color:var(--muted)}
+#home .teacher a{color:var(--brand)}
+#homeMsg{max-width:420px;text-align:center;background:#fff;border-radius:var(--radius);padding:20px;margin-top:10px}
+
+/* ---------- หน้าส่อง AR ---------- */
+#stage{position:fixed;inset:0;background:#000;z-index:50}
+#arContainer{position:absolute;inset:0;overflow:hidden}
+#stage .topbar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 10px) 12px 10px;z-index:60;pointer-events:none}
+#stage .topbar > *{pointer-events:auto}
+#closeAR{background:#000a;color:#fff;border-radius:50px;padding:10px 16px}
+#stage .title{color:#fff;background:#000a;padding:8px 14px;border-radius:50px;font-family:'Mitr';font-size:14px;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:55;pointer-events:none;text-align:center;color:#fff}
+#hint .frame{width:min(64vw,300px);aspect-ratio:1;border-radius:24px;margin:0 auto 16px;position:relative;
+  background:
+   linear-gradient(#fff,#fff) top left/38px 5px no-repeat,linear-gradient(#fff,#fff) top left/5px 38px no-repeat,
+   linear-gradient(#fff,#fff) top right/38px 5px no-repeat,linear-gradient(#fff,#fff) top right/5px 38px no-repeat,
+   linear-gradient(#fff,#fff) bottom left/38px 5px no-repeat,linear-gradient(#fff,#fff) bottom left/5px 38px no-repeat,
+   linear-gradient(#fff,#fff) bottom right/38px 5px no-repeat,linear-gradient(#fff,#fff) bottom right/5px 38px no-repeat;
+  animation:pulse 1.6s ease-in-out infinite}
+#hint .frame::after{content:"";position:absolute;left:8%;right:8%;height:3px;background:var(--brand2);box-shadow:0 0 14px var(--brand2);top:10%;animation:scan 2s ease-in-out infinite}
+#hint span{background:#000a;padding:8px 16px;border-radius:50px;font-family:'Mitr'}
+@keyframes pulse{50%{transform:scale(.96)}}
+@keyframes scan{50%{top:88%}}
+#loadingAR{position:absolute;inset:0;z-index:58;display:grid;place-items:center;color:#fff;background:#000c;font-family:'Mitr';text-align:center}
+.spinner{width:46px;height:46px;border-radius:50%;border:5px solid #ffffff33;border-top-color:#fff;animation:spin 1s linear infinite;margin:0 auto 14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#foundBar{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 14px);z-index:60;background:#fffffff2;border-radius:18px;padding:10px 10px 10px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 30px #0006}
+#foundBar .name{flex:1;font-family:'Mitr';font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#foundBar .name small{display:block;font-family:'Sarabun';color:var(--muted);font-size:12px}
+
+/* แผ่นเนื้อหาที่ลอยใน AR (หน่วย px: 1000px = ความกว้างภาพหลัก) */
+.arPanel{width:1000px;background:#fff;border-radius:40px;padding:22px;box-shadow:0 40px 80px #0007;font-family:'Mitr';color:var(--ink)}
+.arPanel .cap{font-size:54px;padding:6px 14px 18px;line-height:1.25;text-align:center}
+.arPanel img,.arPanel video{width:100%;display:block;border-radius:24px;background:#000}
+.arPanel iframe{width:100%;border:0;border-radius:24px;display:block;background:#f2f2f2}
+.arPanel .linkCard{text-align:center;padding:30px 20px 20px}
+.arPanel .linkCard .ico{font-size:140px;line-height:1}
+.arPanel .linkCard .dom{font-family:'Sarabun';font-size:40px;color:var(--muted);margin:16px 0 30px;word-break:break-all}
+.arPanel .bigBtn{font-size:60px;padding:28px 60px;border-radius:40px;background:var(--brand);color:#fff}
+.arPanel .openRow{text-align:center;padding-top:20px}
+.arPanel .openRow button{font-size:42px;padding:18px 40px;border-radius:30px}
+
+/* ---------- หน้าต่างเต็มจอ ---------- */
+#modal{position:fixed;inset:0;z-index:100;background:#0b0d1ef2;display:flex;flex-direction:column}
+#modal .mhead{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 12px 10px;color:#fff}
+#modal .mhead .t{flex:1;font-family:'Mitr';font-size:17px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#modal .mbody{flex:1;display:flex;align-items:center;justify-content:center;padding:0 10px calc(env(safe-area-inset-bottom) + 10px);min-height:0}
+#modal .mbody img,#modal .mbody video{max-width:100%;max-height:100%;border-radius:12px}
+#modal .mbody iframe{width:100%;height:100%;border:0;border-radius:12px;background:#fff}
+
+/* ---------- โหมดครู: สร้าง AR ---------- */
+#creator{max-width:980px;margin:0 auto;padding:22px 16px 120px}
+#creator header{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+#creator header .logo{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;font-size:28px;flex:none}
+#creator header h1{font-size:24px;margin:0}
+#creator header p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.panel{background:var(--card);border-radius:var(--radius);padding:18px;margin-top:16px;box-shadow:0 2px 10px #0000000a}
+.panel h2{font-size:18px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.step{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--brand);color:#fff;font-size:15px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:200px}
+.field label{font-size:14px;color:var(--muted)}
+.items{display:flex;flex-direction:column;gap:14px}
+.item{display:grid;grid-template-columns:170px 1fr;gap:16px;border:1.5px solid var(--line);border-radius:14px;padding:14px;position:relative}
+.item .num{position:absolute;top:-11px;left:12px;background:var(--brand);color:#fff;font-family:'Mitr';font-size:13px;padding:1px 10px;border-radius:20px}
+.drop{border:2px dashed #c9cbe0;border-radius:12px;aspect-ratio:1;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:14px;cursor:pointer;overflow:hidden;background:#fafbff;position:relative}
+.drop img{width:100%;height:100%;object-fit:contain;background:#fff}
+.drop.over{border-color:var(--brand);background:#efedff}
+.drop .change{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:#000a;color:#fff;font-size:12px;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.item .fields{display:flex;flex-direction:column;gap:10px;min-width:0}
+.typeTabs{display:flex;gap:6px;flex-wrap:wrap}
+.typeTabs button{padding:7px 12px;font-size:14px;background:#f0f1f8}
+.typeTabs button.on{background:var(--ink);color:#fff}
+.urlRow{display:flex;gap:8px}
+.urlRow input{flex:1}
+.urlRow button{flex:none;font-size:14px}
+.detect{font-size:13px;color:var(--muted);min-height:18px}
+.detect.ok{color:#0a8a5f}.detect.bad{color:var(--danger)}
+.item .del{position:absolute;top:8px;right:8px;background:transparent;font-size:18px;padding:4px 8px;color:var(--muted)}
+.item .del:hover{color:var(--danger)}
+.uploadedTag{font-size:13px;background:#eef9f6;color:#0a8a5f;border-radius:8px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center}
+.uploadedTag button{font-size:12px;padding:3px 8px;background:transparent;color:var(--danger)}
+#addItem{width:100%;padding:14px;border:2px dashed #c9cbe0;background:transparent;color:var(--brand)}
+.tips{font-size:14px;color:var(--muted);background:#fff8ec;border-radius:12px;padding:10px 14px;margin-top:12px;line-height:1.6}
+.tips b{color:var(--ink)}
+.progress{height:12px;background:#eceef6;border-radius:20px;overflow:hidden;margin:12px 0 6px}
+.progress div{height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--brand2));transition:width .2s}
+.status{font-size:14px;color:var(--muted)}
+.status.ok{color:#0a8a5f}
+.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px}
+.actions button{padding:14px;font-size:16px}
+.how{font-size:14px;line-height:1.7;color:var(--muted);margin:10px 0 0;padding-left:20px}
+.how code{background:#f0f1f8;padding:1px 6px;border-radius:6px;color:var(--ink)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;z-index:200;font-size:15px;max-width:90vw;box-shadow:0 8px 24px #0004}
+@media (max-width:640px){.item{grid-template-columns:1fr}.drop{aspect-ratio:16/10}}
+
+/* ---------- พิมพ์บัตร ---------- */
+#printArea{display:none}
+@media print{
+  @page{size:A4;margin:12mm}
+  body{background:#fff}
+  body > *:not(#printArea){display:none!important}
+  #printArea{display:block!important;font-family:'Sarabun',sans-serif}
+  .pcard{page-break-inside:avoid;break-inside:avoid;border:1px dashed #bbb;border-radius:6mm;padding:6mm;margin-bottom:6mm;display:flex;gap:6mm;align-items:center}
+  .pcard img.mk{width:110mm;max-height:115mm;object-fit:contain}
+  .pcard .side{flex:1;text-align:center}
+  .pcard .side h3{font-family:'Mitr';font-size:16pt;margin:0 0 4mm}
+  .pcard .side .qr svg,.pcard .side .qr img{width:38mm;height:38mm}
+  .pcard .side p{font-size:10pt;color:#555;margin:2mm 0 0}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== หน้าแรก (นักเรียน) ===== -->
+<section id="home" class="hidden">
+  <div class="logo">📷</div>
+  <h1 id="homeTitle">ส่อง AR</h1>
+  <p class="sub" id="homeSub">กดปุ่มแล้วส่องกล้องไปที่ภาพ</p>
+  <button id="startBtn" class="primary">📷 เริ่มส่อง</button>
+  <div id="homeMsg" class="hidden"></div>
+  <div class="targets hidden" id="homeTargets">
+    <h3>ภาพที่ส่องได้</h3>
+    <div class="thumbGrid" id="homeGrid"></div>
+  </div>
+  <div class="teacher">สำหรับครู: <a href="?create">สร้าง / แก้ไขชุด AR</a></div>
+</section>
+
+<!-- ===== หน้าส่องกล้อง ===== -->
+<section id="stage" class="hidden">
+  <div id="arContainer"></div>
+  <div class="topbar">
+    <button id="closeAR">✕ ปิด</button>
+    <div class="title" id="stageTitle"></div>
+  </div>
+  <div id="loadingAR"><div><div class="spinner"></div>กำลังเปิดกล้อง…</div></div>
+  <div id="hint" class="hidden"><div class="frame"></div><span>ส่องไปที่ภาพให้เต็มกรอบ</span></div>
+  <div id="foundBar" class="hidden">
+    <div class="name"><span id="foundName"></span><small>ส่องค้างไว้ หรือกดดูเต็มจอ</small></div>
+    <button class="primary" id="fullBtn">🔍 ดูเต็มจอ</button>
+  </div>
+</section>
+
+<!-- ===== หน้าต่างเต็มจอ ===== -->
+<section id="modal" class="hidden">
+  <div class="mhead">
+    <div class="t" id="modalTitle"></div>
+    <button class="ghost" id="modalOpen" style="color:#fff;border-color:#ffffff44">↗ เปิดในแท็บใหม่</button>
+    <button id="modalClose">✕</button>
+  </div>
+  <div class="mbody" id="modalBody"></div>
+</section>
+
+<!-- ===== โหมดครู ===== -->
+<section id="creator" class="hidden">
+  <header>
+    <div class="logo">🪄</div>
+    <div>
+      <h1>สร้างชุด AR</h1>
+      <p>ใส่ภาพหลัก แล้วใส่สิ่งที่จะลอยขึ้นมาเมื่อส่อง: ภาพ วิดีโอ เอกสาร หรือลิงก์</p>
+    </div>
+  </header>
+
+  <div class="panel">
+    <h2><span class="step">1</span>ชื่อชุด</h2>
+    <input id="setTitle" placeholder="เช่น บัตรคำ ป.1 หน่วยที่ 1">
+  </div>
+
+  <div class="panel">
+    <h2><span class="step">2</span>ภาพหลัก และสิ่งที่จะลอยขึ้นมา</h2>
+    <div class="items" id="items"></div>
+    <button id="addItem" style="margin-top:14px">＋ เพิ่มภาพหลัก</button>
+    <div class="tips">
+      <b>ภาพหลักที่ส่องติดง่าย:</b> มีรายละเอียดเยอะ สีตัดกัน ไม่เป็นพื้นเรียบ ไม่ซ้ำลายกันทั้งภาพ (ภาพการ์ตูน ภาพถ่าย หน้าปกหนังสือ ใช้ได้ดี) ·
+      <b>ไม่ควรใช้:</b> ภาพที่มีแต่ตัวหนังสือบนพื้นขาว หรือภาพที่ต่างกันนิดเดียว ·
+      <b>ลิงก์ Google Drive / YouTube:</b> ต้องตั้งแชร์เป็น "ทุกคนที่มีลิงก์"
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2><span class="step">3</span>ประมวลผล และทดลองส่อง</h2>
+    <button class="primary" id="compileBtn" style="width:100%;padding:16px;font-size:18px">⚙️ ประมวลผลภาพหลัก</button>
+    <div class="progress hidden" id="progWrap"><div id="prog"></div></div>
+    <div class="status" id="compileStatus">ยังไม่ได้ประมวลผล</div>
+    <div class="actions">
+      <button class="teal" id="previewBtn" disabled>📱 ทดลองส่องในเครื่องนี้</button>
+      <button class="primary" id="downloadBtn" disabled>💾 ดาวน์โหลด ar-data.json</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2><span class="step">4</span>เผยแพร่ให้นักเรียน และพิมพ์บัตร</h2>
+    <div class="field">
+      <label>ที่อยู่เว็บที่นักเรียนจะเปิด (ใช้สร้าง QR Code บนบัตร)</label>
+      <input id="viewerUrl" placeholder="https://ชื่อผู้ใช้.github.io/ar/">
+    </div>
+    <div class="actions">
+      <button id="printBtn">🖨️ พิมพ์บัตรภาพหลัก + QR</button>
+      <button id="openFileBtn">📂 เปิดไฟล์ ar-data.json เดิมมาแก้</button>
+      <button id="loadLiveBtn">🌐 ดึงชุดที่ใช้อยู่บนเว็บมาแก้</button>
+    </div>
+    <ol class="how">
+      <li>กด <b>ดาวน์โหลด ar-data.json</b> แล้วนำไปวางในโฟลเดอร์เดียวกับไฟล์ <code>index.html</code> บนเว็บ (เช่น GitHub Pages) แทนไฟล์เดิม</li>
+      <li>นักเรียนเปิดที่อยู่เว็บ (หรือสแกน QR บนบัตร) → กด <b>เริ่มส่อง</b> → ส่องภาพ</li>
+      <li>ถ้าต้องการหลายชุดในเว็บเดียว ให้ตั้งชื่อไฟล์ต่างกัน เช่น <code>unit1.json</code> แล้วเปิดด้วย <code>…/?data=unit1.json</code></li>
+    </ol>
+    <input type="file" id="jsonFile" accept=".json,application/json" class="hidden">
+  </div>
+</section>
+
+<div id="printArea"></div>
+<div id="toast" class="hidden"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+import { MindARThree } from 'mindar-image-three';
+
+const $ = s => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const IS_CREATE = params.has('create');
+const DATA_FILE = params.get('data') || 'ar-data.json';
+const STORE_KEY = 'ar-maker-project-v1';
+
+/* ---------------- ทั่วไป ---------------- */
+let toastTimer;
+function toast(msg, ms = 3200) {
+  const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), ms);
+}
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function b64ToBytes(b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
+function bytesToB64(bytes) { let s = ''; const CH = 0x8000; for (let i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH)); return btoa(s); }
+function loadImage(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+async function fileToDataURL(file, maxSide, quality = 0.85) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url);
+    const s = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(img, 0, 0, c.width, c.height);
+    return { data: c.toDataURL('image/jpeg', quality), w: c.width, h: c.height };
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/* ---------------- แปลงลิงก์ให้แสดงผลได้ ---------------- */
+function driveId(u) {
+  const m = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:.*&)?id=)([\w-]{20,})/) || u.match(/drive\.google\.com\/.*[?&]id=([\w-]{20,})/);
+  return m ? m[1] : null;
+}
+function youtubeId(u) {
+  const m = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+function guessType(u) {
+  if (!u) return null;
+  if (youtubeId(u)) return 'video';
+  if (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u)) return 'video';
+  if (/\.(jpe?g|png|gif|webp|avif|svg)(\?|#|$)/i.test(u)) return 'image';
+  if (/docs\.google\.com\/(document|presentation|spreadsheets|forms)/.test(u)) return 'doc';
+  if (/\.pdf(\?|#|$)/i.test(u) || /canva\.com\/design/.test(u)) return 'doc';
+  if (driveId(u)) return 'doc';
+  return 'link';
+}
+/* คืนค่า {kind:'img'|'video'|'iframe'|'link', src, ratio(h/w), open} */
+function resolveContent(item) {
+  const u = (item.url || '').trim();
+  const open = u || null;
+  if (item.type === 'image') {
+    if (item.upload) return { kind: 'img', src: item.upload, open: null };
+    const id = driveId(u);
+    return { kind: 'img', src: id ? `https://lh3.googleusercontent.com/d/${id}` : u, open };
+  }
+  if (item.type === 'video') {
+    const yt = youtubeId(u);
+    if (yt) return { kind: 'iframe', src: `https://www.youtube.com/embed/${yt}?playsinline=1&rel=0&enablejsapi=1`, ratio: 9 / 16, open, yt: true };
+    const id = driveId(u);
+    if (id) return { kind: 'iframe', src: `https://drive.google.com/file/d/${id}/preview`, ratio: 9 / 16, open };
+    return { kind: 'video', src: u, open };
+  }
+  if (item.type === 'doc') {
+    let m = u.match(/(https:\/\/docs\.google\.com\/(?:document|presentation|spreadsheets)\/d\/[\w-]+)/);
+    if (m) return { kind: 'iframe', src: m[1] + '/preview', ratio: /presentation/.test(u) ? 0.6 : 1.3, open };
+    m = u.match(/(https:\/\/docs\.google\.com\/forms\/d\/e?\/?[\w-]+)/);
+    if (m) return { kind: 'iframe', src: u.replace(/\/(edit|viewform)(\?.*)?$/, '/viewform') + (u.includes('?') ? '&' : '?') + 'embedded=true', ratio: 1.3, open };
+    const id = driveId(u);
+    if (id) return { kind: 'iframe', src: `https://drive.google.com/file/d/${id}/preview`, ratio: 1.3, open };
+    m = u.match(/(https:\/\/www\.canva\.com\/design\/[\w-]+\/[\w-]+)\//);
+    if (m) return { kind: 'iframe', src: m[1] + '/view?embed', ratio: 0.75, open };
+    return { kind: 'iframe', src: u, ratio: 1.3, open };
+  }
+  return { kind: 'link', src: u, open };
+}
+
+/* ---------------- ส่วนแสดงผล AR ---------------- */
+let ar = null;          // MindARThree
+let arState = null;     // { items, objs[], current }
+let modalItem = null;
+
+function buildPanelEl(item, c) {
+  const el = document.createElement('div');
+  el.className = 'arPanel';
+  if (item.name) { const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = item.name; el.appendChild(cap); }
+  if (c.kind === 'img') {
+    const img = document.createElement('img'); img.src = c.src; img.alt = item.name || ''; el.appendChild(img);
+  } else if (c.kind === 'video') {
+    const v = document.createElement('video'); v.src = c.src; v.controls = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'metadata';
+    el.appendChild(v);
+  } else if (c.kind === 'iframe') {
+    const f = document.createElement('iframe'); f.src = c.src; f.style.height = Math.round(956 * c.ratio) + 'px';
+    f.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture'; f.allowFullscreen = true; el.appendChild(f);
+  } else {
+    let dom = c.src; try { dom = new URL(c.src).hostname.replace(/^www\./, ''); } catch {}
+    el.insertAdjacentHTML('beforeend', `<div class="linkCard"><div class="ico">🔗</div><div class="dom">${esc(dom)}</div></div>`);
+    const b = document.createElement('button'); b.className = 'bigBtn'; b.textContent = 'แตะเพื่อเปิด ↗';
+    b.addEventListener('click', () => c.src && window.open(c.src, '_blank'));
+    el.querySelector('.linkCard').appendChild(b);
+  }
+  return el;
+}
+
+function pauseMedia(el) {
+  if (!el) return;
+  el.querySelectorAll('video').forEach(v => v.pause());
+  el.querySelectorAll('iframe').forEach(f => {
+    if (f.src.includes('youtube.com/embed')) { try { f.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*'); } catch {} }
+  });
+}
+
+async function startAR(data) {
+  const stage = $('#stage');
+  stage.classList.remove('hidden');
+  $('#loadingAR').classList.remove('hidden');
+  $('#hint').classList.add('hidden');
+  $('#foundBar').classList.add('hidden');
+  $('#stageTitle').textContent = data.title || 'ส่อง AR';
+  const container = $('#arContainer');
+  container.innerHTML = '';
+
+  const blobUrl = URL.createObjectURL(new Blob([b64ToBytes(data.mind)], { type: 'application/octet-stream' }));
+  ar = new MindARThree({
+    container, imageTargetSrc: blobUrl, maxTrack: 1,
+    uiLoading: 'no', uiScanning: 'no', uiError: 'yes',
+    filterMinCF: 0.0001, filterBeta: 0.001, missTolerance: 8, warmupTolerance: 3,
+  });
+  const { renderer, scene, cssScene, camera, cssRenderer } = ar;
+  arState = { items: data.items, objs: [], current: null };
+
+  data.items.forEach((item, i) => {
+    const anchor = ar.addCSSAnchor(i);
+    const aspect = item.aspect || 1;             // สูง/กว้าง ของภาพหลัก
+    const rec = { item, anchor, built: false, el: null, obj: null, pivot: null, aspect };
+    arState.objs.push(rec);
+    anchor.onTargetFound = () => {
+      if (!rec.built) {
+        const c = resolveContent(item);
+        rec.content = c;
+        rec.el = buildPanelEl(item, c);
+        rec.obj = new CSS3DObject(rec.el);
+        rec.obj.scale.setScalar(0.85);
+        anchor.group.add(rec.obj);
+        rec.built = true;
+      }
+      arState.current = rec;
+      $('#hint').classList.add('hidden');
+      $('#foundName').textContent = item.name || `ภาพที่ ${i + 1}`;
+      $('#fullBtn').textContent = rec.content.kind === 'link' ? '↗ เปิดลิงก์' : '🔍 ดูเต็มจอ';
+      $('#foundBar').classList.remove('hidden');
+    };
+    anchor.onTargetLost = () => {
+      pauseMedia(rec.el);
+      if (arState.current === rec) {
+        arState.current = null;
+        $('#foundBar').classList.add('hidden');
+        $('#hint').classList.remove('hidden');
+      }
+    };
+  });
+
+  try {
+    await ar.start();
+  } catch (e) {
+    console.error(e);
+    $('#loadingAR').innerHTML = `<div style="padding:24px;max-width:340px">😢 เปิดกล้องไม่ได้<br><small style="font-family:Sarabun">กรุณาอนุญาตให้เว็บใช้กล้อง และเปิดผ่าน https (เช่น GitHub Pages)<br>ถ้าเปิดจากในแอป LINE / Facebook ให้กด "เปิดในเบราว์เซอร์" ก่อน</small><br><br><button class="primary" onclick="location.reload()">ลองใหม่</button></div>`;
+    return;
+  }
+  $('#loadingAR').classList.add('hidden');
+  $('#hint').classList.remove('hidden');
+
+  const clock = new THREE.Clock();
+  renderer.setAnimationLoop(() => {
+    const t = clock.getElapsedTime();
+    for (const r of arState.objs) {
+      if (!r.built || !r.anchor.visible) continue;
+      const h = (r.el.offsetHeight || 800) * 0.85;
+      const bob = Math.sin(t * 2) * 25;
+      if (r.item.mode === 'stand') {
+        // ตั้งขึ้นจากกลางภาพ เอนไปด้านหลังเล็กน้อย เหมือนหนังสือป๊อปอัป
+        const a = THREE.MathUtils.degToRad(70);
+        r.obj.rotation.set(a, 0, 0);
+        r.obj.position.set(0, -150 * r.aspect + Math.cos(a) * h / 2, 30 + bob + Math.sin(a) * h / 2);
+      } else {
+        // ลอยเหนือภาพ
+        r.obj.rotation.set(0, 0, 0);
+        r.obj.position.set(0, 0, 150 + bob);
+      }
+    }
+    renderer.render(scene, camera);
+    cssRenderer.render(cssScene, camera);
+  });
+}
+
+function stopAR() {
+  if (arState) arState.objs.forEach(r => pauseMedia(r.el));
+  if (ar) {
+    try { ar.renderer.setAnimationLoop(null); } catch {}
+    try { ar.stop(); } catch {}
+  }
+  ar = null; arState = null;
+  $('#arContainer').innerHTML = '';
+  $('#stage').classList.add('hidden');
+}
+
+function openModal(item) {
+  const c = resolveContent(item);
+  if (c.kind === 'link') { if (c.src) window.open(c.src, '_blank'); return; }
+  modalItem = item;
+  if (arState) arState.objs.forEach(r => pauseMedia(r.el));
+  $('#modalTitle').textContent = item.name || '';
+  const body = $('#modalBody'); body.innerHTML = '';
+  if (c.kind === 'img') { const i = document.createElement('img'); i.src = c.src; body.appendChild(i); }
+  else if (c.kind === 'video') { const v = document.createElement('video'); v.src = c.src; v.controls = true; v.playsInline = true; v.autoplay = true; body.appendChild(v); }
+  else { const f = document.createElement('iframe'); f.src = c.src.replace('enablejsapi=1', 'enablejsapi=1&autoplay=1'); f.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture'; f.allowFullscreen = true; body.appendChild(f); }
+  $('#modalOpen').classList.toggle('hidden', !c.open);
+  $('#modal').classList.remove('hidden');
+}
+$('#modalClose').onclick = () => { $('#modal').classList.add('hidden'); $('#modalBody').innerHTML = ''; modalItem = null; };
+$('#modalOpen').onclick = () => { if (modalItem) { const c = resolveContent(modalItem); if (c.open) window.open(c.open, '_blank'); } };
+$('#fullBtn').onclick = () => { if (arState?.current) openModal(arState.current.item); };
+$('#closeAR').onclick = () => { stopAR(); if (IS_CREATE) $('#creator').classList.remove('hidden'); };
+
+/* ---------------- หน้าแรกนักเรียน ---------------- */
+async function initViewer() {
+  $('#home').classList.remove('hidden');
+  let data = null;
+  try {
+    const r = await fetch(DATA_FILE, { cache: 'no-cache' });
+    if (!r.ok) throw new Error(r.status);
+    data = await r.json();
+    if (!data.mind || !Array.isArray(data.items) || !data.items.length) throw new Error('bad');
+  } catch {
+    $('#startBtn').classList.add('hidden');
+    $('#homeSub').textContent = '';
+    $('#homeMsg').classList.remove('hidden');
+    $('#homeMsg').innerHTML = `ยังไม่มีชุด AR ในเว็บนี้ (ไม่พบไฟล์ <b>${esc(DATA_FILE)}</b>)<br><br><a href="?create"><button class="primary">🪄 สร้างชุด AR</button></a>`;
+    return;
+  }
+  document.title = data.title || 'ส่อง AR';
+  $('#homeTitle').textContent = data.title || 'ส่อง AR';
+  $('#homeSub').textContent = `ส่องได้ ${data.items.length} ภาพ · กดปุ่มแล้วส่องกล้องไปที่ภาพ`;
+  const grid = $('#homeGrid');
+  grid.innerHTML = data.items.map((it, i) => it.marker ? `<figure><img src="${it.marker}" alt=""><figcaption>${esc(it.name || 'ภาพที่ ' + (i + 1))}</figcaption></figure>` : '').join('');
+  if (grid.innerHTML) $('#homeTargets').classList.remove('hidden');
+  $('#startBtn').onclick = () => startAR(data);
+}
+
+/* ---------------- โหมดครู ---------------- */
+let project = { title: '', viewerUrl: '', items: [] };
+let compiled = null;   // { mindB64, sig }
+const TYPES = [['image', '🖼️ ภาพ'], ['video', '🎬 วิดีโอ'], ['doc', '📄 เอกสาร'], ['link', '🔗 ลิงก์เว็บ']];
+const PLACEHOLDER = {
+  image: 'วางลิงก์ภาพ (หรือ Google Drive) หรือกดอัปโหลดภาพ',
+  video: 'ลิงก์ YouTube, Google Drive หรือไฟล์ .mp4',
+  doc: 'ลิงก์ Google Docs / Slides / Drive (PDF) / Canva',
+  link: 'ลิงก์เว็บไซต์ใดก็ได้ เช่น เกม แบบทดสอบ',
+};
+const newItem = () => ({ id: Math.random().toString(36).slice(2, 9), name: '', marker: null, aspect: 1, type: 'image', url: '', upload: null, mode: 'float' });
+const sigOf = () => project.items.map(i => i.marker ? i.marker.length + ':' + i.marker.slice(-40) : 'x').join('|');
+
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ ...project, compiled })); }
+  catch { toast('⚠️ บันทึกอัตโนมัติไม่ได้ (ข้อมูลใหญ่เกินไป) — อย่าลืมดาวน์โหลดไฟล์เก็บไว้'); }
+}
+function refreshCompileState() {
+  const ok = compiled && compiled.sig === sigOf() && project.items.length;
+  $('#previewBtn').disabled = !ok;
+  $('#downloadBtn').disabled = !ok;
+  const st = $('#compileStatus');
+  if (ok) { st.textContent = `✅ ประมวลผลแล้ว ${project.items.length} ภาพ พร้อมทดลองส่อง/ดาวน์โหลด`; st.className = 'status ok'; }
+  else if (compiled) { st.textContent = '⚠️ ภาพหลักมีการเปลี่ยนแปลง กรุณากดประมวลผลอีกครั้ง'; st.className = 'status'; }
+  else { st.textContent = 'ยังไม่ได้ประมวลผล'; st.className = 'status'; }
+}
+
+function detectText(it) {
+  if (it.type === 'image' && it.upload) return ['ok', '✓ ใช้ภาพที่อัปโหลด'];
+  const u = (it.url || '').trim();
+  if (!u) return ['', ''];
+  if (!/^https?:\/\//i.test(u)) return ['bad', 'ลิงก์ต้องขึ้นต้นด้วย https://'];
+  const g = guessType(u);
+  const c = resolveContent(it);
+  const label = { img: 'แสดงเป็นภาพ', video: 'แสดงเป็นวิดีโอ', iframe: 'แสดงเนื้อหาลอยในอากาศ', link: 'แสดงเป็นปุ่มให้แตะเปิด' }[c.kind];
+  let extra = '';
+  if (youtubeId(u)) extra = ' (YouTube)'; else if (driveId(u)) extra = ' (Google Drive)';
+  const warn = g && g !== it.type && !(g === 'doc' && driveId(u)) ? ` · ลิงก์นี้น่าจะเป็น "${TYPES.find(t => t[0] === g)[1]}"` : '';
+  return [warn ? '' : 'ok', '✓ ' + label + extra + warn];
+}
+
+function renderItems() {
+  const box = $('#items');
+  box.innerHTML = '';
+  project.items.forEach((it, idx) => {
+    const d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = `
+      <span class="num">ภาพที่ ${idx + 1}</span>
+      <button class="del" title="ลบ">🗑</button>
+      <div>
+        <div class="drop">${it.marker ? `<img src="${it.marker}"><span class="change">แตะเพื่อเปลี่ยน</span>` : '<div>🖼️<br>แตะหรือลากภาพหลัก<br>มาวางที่นี่</div>'}</div>
+        <input type="file" accept="image/*" class="hidden mkFile">
+      </div>
+      <div class="fields">
+        <div class="field"><label>ชื่อ (แสดงเหนือเนื้อหา)</label><input class="nm" value="${esc(it.name)}" placeholder="เช่น ไก่"></div>
+        <div class="field"><label>สิ่งที่จะลอยขึ้นมา</label>
+          <div class="typeTabs">${TYPES.map(([k, l]) => `<button data-t="${k}" class="${it.type === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        </div>
+        <div class="urlRow"><input class="url" value="${esc(it.url)}" placeholder="${PLACEHOLDER[it.type]}">${it.type === 'image' ? '<button class="upBtn">⬆ อัปโหลด</button>' : ''}</div>
+        <input type="file" accept="image/*" class="hidden upFile">
+        ${it.type === 'image' && it.upload ? '<div class="uploadedTag">🖼️ ใช้ภาพที่อัปโหลดแล้ว <button class="rmUp">ลบภาพ</button></div>' : ''}
+        <div class="detect"></div>
+        <div class="field"><label>ลักษณะการลอย</label>
+          <select class="mode">
+            <option value="float" ${it.mode !== 'stand' ? 'selected' : ''}>ลอยเหนือภาพ (เหมาะกับภาพบนผนัง/ในหนังสือ)</option>
+            <option value="stand" ${it.mode === 'stand' ? 'selected' : ''}>ตั้งขึ้นจากภาพ (เหมาะกับบัตรวางบนโต๊ะ)</option>
+          </select>
+        </div>
+      </div>`;
+    const setDetect = () => { const [cls, txt] = detectText(it); const el = d.querySelector('.detect'); el.className = 'detect ' + cls; el.textContent = txt; };
+    setDetect();
+
+    const drop = d.querySelector('.drop'), mkFile = d.querySelector('.mkFile');
+    const takeMarker = async f => {
+      if (!f || !f.type.startsWith('image/')) return toast('กรุณาเลือกไฟล์ภาพ');
+      const r = await fileToDataURL(f, 800, 0.9);
+      it.marker = r.data; it.aspect = r.h / r.w;
+      if (!it.name) it.name = f.name.replace(/\.[^.]+$/, '').slice(0, 40);
+      save(); renderItems(); refreshCompileState();
+    };
+    drop.onclick = () => mkFile.click();
+    mkFile.onchange = e => takeMarker(e.target.files[0]);
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); takeMarker(e.dataTransfer.files[0]); };
+
+    d.querySelector('.nm').oninput = e => { it.name = e.target.value; save(); };
+    d.querySelector('.url').oninput = e => {
+      it.url = e.target.value.trim();
+      const g = guessType(it.url);
+      if (g && g !== it.type && !it._typeTouched && !(it.type === 'image' && it.upload)) { it.type = g; save(); renderItems(); const ni = $('#items').children[idx].querySelector('.url'); ni.focus(); ni.setSelectionRange(ni.value.length, ni.value.length); return; }
+      save(); setDetect();
+    };
+    d.querySelectorAll('.typeTabs button').forEach(b => b.onclick = () => { it.type = b.dataset.t; it._typeTouched = true; save(); renderItems(); });
+    d.querySelector('.mode').onchange = e => { it.mode = e.target.value; save(); };
+    const upBtn = d.querySelector('.upBtn'), upFile = d.querySelector('.upFile');
+    if (upBtn) upBtn.onclick = () => upFile.click();
+    upFile.onchange = async e => { const f = e.target.files[0]; if (!f) return; const r = await fileToDataURL(f, 1200, 0.82); it.upload = r.data; save(); renderItems(); };
+    const rmUp = d.querySelector('.rmUp'); if (rmUp) rmUp.onclick = () => { it.upload = null; save(); renderItems(); };
+    d.querySelector('.del').onclick = () => {
+      if ((it.marker || it.url) && !confirm(`ลบภาพที่ ${idx + 1}?`)) return;
+      project.items.splice(idx, 1); save(); renderItems(); refreshCompileState();
+    };
+    box.appendChild(d);
+  });
+}
+
+function validate() {
+  if (!project.items.length) return 'ยังไม่มีภาพหลัก';
+  for (let i = 0; i < project.items.length; i++) {
+    const it = project.items[i];
+    if (!it.marker) return `ภาพที่ ${i + 1} ยังไม่ได้ใส่ภาพหลัก`;
+    if (!(it.type === 'image' && it.upload) && !/^https?:\/\//i.test(it.url || '')) return `ภาพที่ ${i + 1} ยังไม่ได้ใส่ลิงก์เนื้อหา`;
+  }
+  return null;
+}
+
+let CompilerCls = null;
+async function compile() {
+  const err = validate(); if (err) return toast('⚠️ ' + err);
+  const btn = $('#compileBtn'); btn.disabled = true;
+  $('#progWrap').classList.remove('hidden'); $('#prog').style.width = '0%';
+  const st = $('#compileStatus'); st.className = 'status';
+  st.textContent = 'กำลังเตรียมเครื่องมือ…';
+  try {
+    if (!CompilerCls) CompilerCls = (await import('mindar-image')).Compiler;
+    const imgs = await Promise.all(project.items.map(i => loadImage(i.marker)));
+    const compiler = new CompilerCls();
+    const t0 = performance.now();
+    await compiler.compileImageTargets(imgs, p => {
+      $('#prog').style.width = Math.min(100, p).toFixed(0) + '%';
+      st.textContent = `กำลังประมวลผลภาพหลัก ${Math.min(100, p).toFixed(0)}% (มือถืออาจใช้เวลาภาพละ 10–30 วินาที)`;
+    });
+    const buf = compiler.exportData();
+    compiled = { mindB64: bytesToB64(new Uint8Array(buf)), sig: sigOf() };
+    save();
+    $('#prog').style.width = '100%';
+    refreshCompileState();
+    toast(`✅ ประมวลผลเสร็จใน ${((performance.now() - t0) / 1000).toFixed(1)} วินาที`);
+  } catch (e) {
+    console.error(e);
+    st.textContent = '❌ ประมวลผลไม่สำเร็จ: ' + (e?.message || e);
+  } finally { btn.disabled = false; setTimeout(() => $('#progWrap').classList.add('hidden'), 800); }
+}
+
+function exportData() {
+  return {
+    app: 'ar-maker', version: 1, title: project.title || 'ส่อง AR', created: new Date().toISOString(),
+    mind: compiled.mindB64,
+    items: project.items.map(({ name, marker, aspect, type, url, upload, mode }) => ({ name, marker, aspect, type, url, upload, mode })),
+  };
+}
+function download() {
+  const data = exportData();
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ar-data.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`💾 ดาวน์โหลดแล้ว (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+}
+function importData(data, from) {
+  if (!data || !Array.isArray(data.items)) return toast('ไฟล์ไม่ถูกต้อง');
+  project.title = data.title || '';
+  project.items = data.items.map(x => ({ ...newItem(), ...x, _typeTouched: true }));
+  compiled = data.mind ? { mindB64: data.mind, sig: sigOf() } : null;
+  $('#setTitle').value = project.title;
+  save(); renderItems(); refreshCompileState();
+  toast(`📂 เปิดชุด "${project.title || 'ไม่มีชื่อ'}" จาก${from}แล้ว (${project.items.length} ภาพ)`);
+}
+
+function printCards() {
+  const err = validate(); if (err) return toast('⚠️ ' + err);
+  const url = ($('#viewerUrl').value || '').trim();
+  let qrHtml = '';
+  if (url && window.qrcode) { const q = qrcode(0, 'M'); q.addData(url); q.make(); qrHtml = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); }
+  $('#printArea').innerHTML = project.items.map((it, i) => `
+    <div class="pcard">
+      <img class="mk" src="${it.marker}">
+      <div class="side">
+        <h3>${esc(it.name || 'ภาพที่ ' + (i + 1))}</h3>
+        ${qrHtml ? `<div class="qr">${qrHtml}</div><p>สแกนเพื่อเปิดกล้อง AR<br>แล้วส่องภาพนี้</p>` : '<p>ส่องภาพนี้ด้วยกล้อง AR</p>'}
+      </div>
+    </div>`).join('');
+  if (!qrHtml) toast('ไม่ได้ใส่ที่อยู่เว็บ จึงไม่มี QR Code บนบัตร');
+  setTimeout(() => window.print(), 300);
+}
+
+function initCreator() {
+  $('#creator').classList.remove('hidden');
+  document.title = 'สร้างชุด AR';
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (s) { project = { title: s.title || '', viewerUrl: s.viewerUrl || '', items: s.items || [] }; compiled = s.compiled || null; }
+  } catch {}
+  if (!project.items.length) project.items.push(newItem());
+  if (!project.viewerUrl) project.viewerUrl = location.origin.startsWith('http') ? location.origin + location.pathname : '';
+  $('#setTitle').value = project.title;
+  $('#viewerUrl').value = project.viewerUrl;
+  $('#setTitle').oninput = e => { project.title = e.target.value; save(); };
+  $('#viewerUrl').oninput = e => { project.viewerUrl = e.target.value; save(); };
+  $('#addItem').onclick = () => { project.items.push(newItem()); save(); renderItems(); refreshCompileState(); };
+  $('#compileBtn').onclick = compile;
+  $('#downloadBtn').onclick = download;
+  $('#previewBtn').onclick = () => { $('#creator').classList.add('hidden'); startAR(exportData()); };
+  $('#printBtn').onclick = printCards;
+  $('#openFileBtn').onclick = () => $('#jsonFile').click();
+  $('#jsonFile').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { importData(JSON.parse(await f.text()), 'ไฟล์'); } catch { toast('อ่านไฟล์ไม่ได้'); } e.target.value = ''; };
+  $('#loadLiveBtn').onclick = async () => {
+    try { const r = await fetch(DATA_FILE, { cache: 'no-cache' }); if (!r.ok) throw 0; const d = await r.json();
+      if (project.items.some(i => i.marker) && !confirm('แทนที่งานที่กำลังทำอยู่ด้วยชุดบนเว็บ?')) return;
+      importData(d, 'เว็บ'); } catch { toast(`ไม่พบไฟล์ ${DATA_FILE} บนเว็บนี้`); }
+  };
+  renderItems(); refreshCompileState();
+}
+
+if (IS_CREATE) initCreator(); else initViewer();
+</script>
+</body>
+</html>
