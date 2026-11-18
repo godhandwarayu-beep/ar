@@ -36,21 +36,13 @@ input:focus,select:focus{outline:none;border-color:var(--brand)}
 .hidden{display:none!important}
 
 /* ---------- หน้าแรกนักเรียน ---------- */
-#home{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:28px 18px 40px;
+#home{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;
   background:radial-gradient(circle at 20% 0%,#e9e6ff 0,transparent 55%),radial-gradient(circle at 100% 30%,#d9f7f3 0,transparent 50%),var(--bg)}
-#home .logo{width:86px;height:86px;border-radius:26px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;font-size:44px;box-shadow:0 12px 30px #5b4bff44;margin-top:10px}
-#home h1{font-size:28px;margin:18px 0 4px;text-align:center}
-#home p.sub{color:var(--muted);margin:0 0 22px;text-align:center}
-#startBtn{font-size:22px;padding:18px 36px;border-radius:20px;box-shadow:0 10px 24px #5b4bff55}
-#home .targets{margin-top:30px;width:100%;max-width:560px}
-#home .targets h3{font-size:16px;color:var(--muted);margin:0 0 10px}
-.thumbGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
-.thumbGrid figure{margin:0;background:#fff;border-radius:12px;padding:6px;box-shadow:0 2px 8px #0000000d}
-.thumbGrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block}
-.thumbGrid figcaption{font-size:13px;text-align:center;padding:5px 2px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#home .teacher{margin-top:auto;padding-top:30px;font-size:14px;color:var(--muted)}
-#home .teacher a{color:var(--brand)}
-#homeMsg{max-width:420px;text-align:center;background:#fff;border-radius:var(--radius);padding:20px;margin-top:10px}
+#startBtn{width:min(62vw,260px);aspect-ratio:1;border-radius:50%;font-size:clamp(44px,13vw,64px);
+  background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:0 16px 40px #5b4bff55;animation:breathe 2.4s ease-in-out infinite}
+#startBtn:active{transform:scale(.95)}
+@keyframes breathe{50%{transform:scale(1.05);box-shadow:0 22px 50px #5b4bff66}}
+#homeMsg{max-width:420px;text-align:center;background:#fff;border-radius:var(--radius);padding:20px}
 
 /* ---------- หน้าส่อง AR ---------- */
 #stage{position:fixed;inset:0;background:#000;z-index:50}
@@ -164,16 +156,8 @@ input:focus,select:focus{outline:none;border-color:var(--brand)}
 
 <!-- ===== หน้าแรก (นักเรียน) ===== -->
 <section id="home" class="hidden">
-  <div class="logo">📷</div>
-  <h1 id="homeTitle">ส่อง AR</h1>
-  <p class="sub" id="homeSub">กดปุ่มแล้วส่องกล้องไปที่ภาพ</p>
-  <button id="startBtn" class="primary">📷 เริ่มส่อง</button>
+  <button id="startBtn" class="primary">ส่อง</button>
   <div id="homeMsg" class="hidden"></div>
-  <div class="targets hidden" id="homeTargets">
-    <h3>ภาพที่ส่องได้</h3>
-    <div class="thumbGrid" id="homeGrid"></div>
-  </div>
-  <div class="teacher">สำหรับครู: <a href="?create">สร้าง / แก้ไขชุด AR</a></div>
 </section>
 
 <!-- ===== หน้าส่องกล้อง ===== -->
@@ -503,17 +487,11 @@ async function initViewer() {
     if (!data.mind || !Array.isArray(data.items) || !data.items.length) throw new Error('bad');
   } catch {
     $('#startBtn').classList.add('hidden');
-    $('#homeSub').textContent = '';
     $('#homeMsg').classList.remove('hidden');
     $('#homeMsg').innerHTML = `ยังไม่มีชุด AR ในเว็บนี้ (ไม่พบไฟล์ <b>${esc(DATA_FILE)}</b>)<br><br><a href="?create"><button class="primary">🪄 สร้างชุด AR</button></a>`;
     return;
   }
-  document.title = data.title || 'ส่อง AR';
-  $('#homeTitle').textContent = data.title || 'ส่อง AR';
-  $('#homeSub').textContent = `ส่องได้ ${data.items.length} ภาพ · กดปุ่มแล้วส่องกล้องไปที่ภาพ`;
-  const grid = $('#homeGrid');
-  grid.innerHTML = data.items.map((it, i) => it.marker ? `<figure><img src="${it.marker}" alt=""><figcaption>${esc(it.name || 'ภาพที่ ' + (i + 1))}</figcaption></figure>` : '').join('');
-  if (grid.innerHTML) $('#homeTargets').classList.remove('hidden');
+  document.title = 'ส่อง';
   $('#startBtn').onclick = () => startAR(data);
 }
 
