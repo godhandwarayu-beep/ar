@@ -79,6 +79,12 @@ input:focus,select:focus{outline:none;border-color:var(--brand)}
 .arPanel .linkCard .ico{font-size:140px;line-height:1}
 .arPanel .linkCard .dom{font-family:'Sarabun';font-size:40px;color:var(--muted);margin:16px 0 30px;word-break:break-all}
 .arPanel .bigBtn{font-size:60px;padding:28px 60px;border-radius:40px;background:var(--brand);color:#fff}
+.arPanel .mediaWrap{position:relative}
+.arPanel .playOv{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;border-radius:24px;background:#0005;color:#fff;transition:opacity .3s}
+.arPanel .playOv span{width:220px;height:220px;border-radius:50%;background:#ff0033;display:grid;place-items:center;font-size:110px;padding-left:14px;box-shadow:0 20px 50px #0008}
+.arPanel .playOv em{font-style:normal;font-size:56px;background:#000a;padding:8px 30px;border-radius:40px}
+.arPanel.playing .playOv{background:transparent;opacity:0}
+.arPanel .bigBtn{display:inline-block}
 .arPanel .openRow{text-align:center;padding-top:20px}
 .arPanel .openRow button{font-size:42px;padding:18px 40px;border-radius:30px}
 
@@ -374,28 +380,61 @@ function buildPanelEl(item, c) {
   if (item.name) { const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = item.name; el.appendChild(cap); }
   if (c.kind === 'img') {
     const img = document.createElement('img'); img.src = c.src; img.alt = item.name || ''; el.appendChild(img);
-  } else if (c.kind === 'video') {
-    const v = document.createElement('video'); v.src = c.src; v.controls = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'metadata';
-    el.appendChild(v);
-  } else if (c.kind === 'iframe') {
-    const f = document.createElement('iframe'); f.src = c.src; f.style.height = Math.round(956 * c.ratio) + 'px';
-    f.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture'; f.allowFullscreen = true; el.appendChild(f);
+  } else if (c.kind === 'video' || c.kind === 'iframe') {
+    // ห่อสื่อไว้ แล้ววางปุ่มเล่นทับ (แตะที่แผ่นเพื่อเล่น/หยุด)
+    const wrap = document.createElement('div'); wrap.className = 'mediaWrap';
+    let m;
+    if (c.kind === 'video') {
+      m = document.createElement('video'); m.src = c.src; m.playsInline = true; m.setAttribute('playsinline', ''); m.preload = 'metadata';
+      m.addEventListener('ended', () => setPlayUI(el, false));
+    } else {
+      m = document.createElement('iframe'); m.src = c.src; m.style.height = Math.round(956 * c.ratio) + 'px';
+      m.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture'; m.allowFullscreen = true;
+    }
+    m.style.pointerEvents = 'none';
+    wrap.appendChild(m);
+    const playable = c.kind === 'video' || c.yt;
+    const ov = document.createElement('div'); ov.className = 'playOv';
+    ov.innerHTML = playable ? '<span>▶</span><em>แตะเพื่อเล่น</em>' : '<span>🔍</span><em>แตะเพื่อเปิดดู</em>';
+    wrap.appendChild(ov);
+    el.appendChild(wrap);
   } else {
     let dom = c.src; try { dom = new URL(c.src).hostname.replace(/^www\./, ''); } catch {}
-    el.insertAdjacentHTML('beforeend', `<div class="linkCard"><div class="ico">🔗</div><div class="dom">${esc(dom)}</div></div>`);
-    const b = document.createElement('button'); b.className = 'bigBtn'; b.textContent = 'แตะเพื่อเปิด ↗';
-    b.addEventListener('click', () => c.src && window.open(c.src, '_blank'));
-    el.querySelector('.linkCard').appendChild(b);
+    el.insertAdjacentHTML('beforeend', `<div class="linkCard"><div class="ico">🔗</div><div class="dom">${esc(dom)}</div><div class="bigBtn">แตะเพื่อเปิด ↗</div></div>`);
   }
   return el;
+}
+
+function ytCmd(f, func) { try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*'); } catch {} }
+function setPlayUI(el, playing) {
+  if (!el) return;
+  el.classList.toggle('playing', playing);
+  const ov = el.querySelector('.playOv');
+  if (ov && ov.querySelector('span').textContent !== '🔍') ov.innerHTML = playing ? '<span>⏸</span><em>แตะเพื่อหยุด</em>' : '<span>▶</span><em>แตะเพื่อเล่น</em>';
 }
 
 function pauseMedia(el) {
   if (!el) return;
   el.querySelectorAll('video').forEach(v => v.pause());
-  el.querySelectorAll('iframe').forEach(f => {
-    if (f.src.includes('youtube.com/embed')) { try { f.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*'); } catch {} }
-  });
+  el.querySelectorAll('iframe').forEach(f => { if (f.src.includes('youtube.com/embed')) ytCmd(f, 'pauseVideo'); });
+  setPlayUI(el, false);
+}
+
+// แตะที่แผ่นที่ลอยอยู่
+function tapPanel(rec) {
+  const c = rec.content, el = rec.el;
+  if (c.kind === 'link') { if (c.src) window.open(c.src, '_blank'); return; }
+  if (c.kind === 'img' || (c.kind === 'iframe' && !c.yt)) { openModal(rec.item); return; }
+  const playing = el.classList.contains('playing');
+  if (c.kind === 'video') {
+    const v = el.querySelector('video');
+    if (playing) { v.pause(); setPlayUI(el, false); }
+    else { v.play().then(() => setPlayUI(el, true)).catch(() => openModal(rec.item)); }
+  } else {
+    const f = el.querySelector('iframe');
+    if (playing) { ytCmd(f, 'pauseVideo'); setPlayUI(el, false); }
+    else { ytCmd(f, 'playVideo'); setPlayUI(el, true); }
+  }
 }
 
 async function startAR(data) {
@@ -507,6 +546,12 @@ function openModal(item) {
 }
 $('#modalClose').onclick = () => { $('#modal').classList.add('hidden'); $('#modalBody').innerHTML = ''; modalItem = null; };
 $('#modalOpen').onclick = () => { if (modalItem) { const c = resolveContent(modalItem); if (c.open) window.open(c.open, '_blank'); } };
+$('#arContainer').addEventListener('click', e => {
+  const rec = arState?.current;
+  if (!rec || !rec.built) return;
+  const r = rec.el.getBoundingClientRect();
+  if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) tapPanel(rec);
+});
 $('#fullBtn').onclick = () => { if (arState?.current) openModal(arState.current.item); };
 $('#closeAR').onclick = () => { stopAR(); if (IS_CREATE) { $('#creator').classList.remove('hidden'); if (API_URL) $('#saveBar').classList.remove('hidden'); } };
 
